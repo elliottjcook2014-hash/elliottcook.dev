@@ -1,0 +1,12 @@
+#MainNav {
+  float: right;
+  margin-right: 50px;
+  background-color: var(--accent-color)
+}
+body {
+  color: var(--text-color);
+}
+div, nav {
+  border: 2px solid var(--dark-color);
+  border-radius: 24px;
+}
