@@ -5,17 +5,9 @@
 		"directory": "./"
 	},
 	"previews": {},
-	"d1_databases": [
-		{
-			"binding": "accounts",
-			"database_name": "accounts",
-			"database_id": "e4fc5b78-5f22-48cb-a3cd-d590f7d1c98c"
-		},
-		{
-			"binding": "accounts",
-			"database_name": "accounts",
-			"database_id": "e4fc5b78-5f22-48cb-a3cd-d590f7d1c98c",
-			"remote": true
-		}
-	]
-}
+  	"exclude": [
+      ".wrangler/**/*",
+      ".git/**/*",
+      "node_modules/**/*"
+    ]
+} 
