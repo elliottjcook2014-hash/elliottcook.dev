@@ -1,5 +1,114 @@
 <html>
-    <head></head>
+    <head>
+        <script>
+            import { Hono } from "hono";
+            import { cors } from "hono/cors";
+            import { setCookie, getCookie } from "hono/cookie";
+
+            const app = new Hono<{ Bindings: Env }>();
+
+            app.use(
+              "*",
+              cors({
+                origin: ["https://elliottcook.dev", "http://127.0.0.1:5500"],
+                credentials: true, // Required so browser sends and receives cookies
+                allowMethods: ["POST", "GET", "OPTIONS"],
+                allowHeaders: ["Content-Type"],
+              })
+            );
+
+            async function hashPassword(password: string): Promise<string> {
+              const encoder = new TextEncoder();
+              const data = encoder.encode(password);
+              const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+              const hashArray = Array.from(new Uint8Array(hashBuffer));
+              return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+            }
+
+            // LOGIN ENDPOINT
+            app.post("/accounts/login", async (c) => {
+              try {
+                const { username, password } = await c.req.json();
+
+                if (!username || !password) {
+                  return c.json({ error: "Username and password are required" }, 400);
+                }
+
+                const passwordHash = await hashPassword(password);
+
+                // 1. Fetch user from database
+                const user: any = await c.env.DB
+                  .prepare("SELECT * FROM users WHERE username = ? AND password_hash = ?")
+                  .bind(username, passwordHash)
+                  .first();
+
+                if (!user) {
+                  return c.json({ error: "Invalid username or password" }, 401);
+                }
+
+                // 2. Generate a secure random session token
+                const sessionToken = crypto.randomUUID();
+                const expiresAt = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60; // 7 days from now
+
+                // 3. Save session in D1
+                await c.env.DB
+                  .prepare("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
+                  .bind(sessionToken, user.id, expiresAt)
+                  .run();
+
+                // 4. Store token in an HttpOnly cookie
+                setCookie(c, "session_id", sessionToken, {
+                  path: "/",
+                  secure: true, // Sent over HTTPS only
+                  httpOnly: true, // JS cannot access this cookie (XSS protection)
+                  maxAge: 7 * 24 * 60 * 60,
+                  sameSite: "None", // Allows cross-site cookie sending if backend and frontend are on different domains
+                });
+
+                return c.json({
+                  success: true,
+                  message: "Logged in successfully!",
+                  user: { username: user.username, firstName: user.first_name },
+                });
+              } catch (error) {
+                return c.json({ error: "Internal Server Error" }, 500);
+              }
+            });
+
+            // AUTH CHECK / ME ENDPOINT
+            app.get("/accounts/me", async (c) => {
+              const sessionId = getCookie(c, "session_id");
+
+              if (!sessionId) {
+                return c.json({ authenticated: false }, 401);
+              }
+
+              const now = Math.floor(Date.now() / 1000);
+
+              // Look up active sessiona
+              const session: any = await c.env.DB
+                .prepare(
+                  `SELECT users.username, users.first_name 
+                   FROM sessions 
+                   JOIN users ON sessions.user_id = users.id 
+                   WHERE sessions.id = ? AND sessions.expires_at > ?`
+                )
+                .bind(sessionId, now)
+                .first();
+
+              if (!session) {
+                return c.json({ authenticated: false }, 401);
+              }
+
+              return c.json({
+                authenticated: true,
+                user: { username: session.username, firstName: session.first_name },
+              });
+            });
+
+            export default app;
+        </script>
+    </head>
     <body>
         <h1>Accounts page</h1>
         <p>Log in to your account to access games and other things</p>
