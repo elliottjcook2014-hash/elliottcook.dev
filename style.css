@@ -10,3 +10,6 @@ div, nav {
   border: 2px solid var(--dark-color);
   border-radius: 24px;
 }
+.admin {
+  display: none;
+}
