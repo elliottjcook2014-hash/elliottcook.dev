@@ -1,10 +1,11 @@
+
 async function checkAdminPermission() {
     try {
         const response = await fetch(
             'https://api.elliottcook.dev/accounts/me',
             {
                 method: 'GET',
-                credentials: 'include',
+                credentials: 'include'
             }
         );
 
@@ -14,9 +15,8 @@ async function checkAdminPermission() {
         }
 
         const data = await response.json();
-        const perm = String(data.permission_level);
 
-        if (perm === '2') {
+        if (data.authenticated && data.user?.permission_level === 2) {
             document.querySelectorAll('.admin').forEach(element => {
                 element.style.display = 'block';
             });
